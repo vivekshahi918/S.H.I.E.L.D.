@@ -232,7 +232,7 @@ export class EmailService {
   private async generateAnalysis(text: string) {
     try {
       // Using gemini-1.5-flash as it is the most stable standard for this API version
-      const model = this.genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const model = this.genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
       
       const prompt = `
         Analyze this email. Return ONLY raw JSON.
