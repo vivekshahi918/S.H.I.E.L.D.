@@ -25,8 +25,10 @@ export class AuthController {
     });
 
     console.log('Login successful, saving session...');
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+
     req.session.save(() => {
-      res.redirect('http://localhost:5173/dashboard?status=success');
+      res.redirect(`${frontendUrl}/dashboard?status=success`);
     });
   }
 }

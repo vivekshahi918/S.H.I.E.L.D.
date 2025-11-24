@@ -1,5 +1,6 @@
 import { Shield, Mail } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { BASE_URL } from '../lib/api';
 
 export default function Login() {
   const [rainbowActive, setRainbowActive] = useState(false);
@@ -52,7 +53,7 @@ export default function Login() {
   }, [showDescription]);
 
   const handleLogin = () => {
-    window.location.href = 'http://localhost:3000/auth/google';
+    window.location.href = `${BASE_URL}/auth/google`;
   };
 
   return (

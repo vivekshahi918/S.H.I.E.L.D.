@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api } from '../lib/api';
+import { api, BASE_URL } from '../lib/api';
 import { 
   Archive, RefreshCw, LogOut, Mail, FileText, 
   Paperclip, PieChart as ChartIcon, Sparkles, 
@@ -63,7 +63,8 @@ export default function Dashboard() {
   };
 
   const handleAttachmentClick = (msgId: string, attId: string, filename: string) => {
-    const url = `http://localhost:3000/email/${msgId}/attachment/${attId}?filename=${encodeURIComponent(filename)}`;
+    const url = `${BASE_URL}/email/${msgId}/attachment/${attId}?filename=${encodeURIComponent(filename)}`;
+    
     window.open(url, '_blank');
   };
 
