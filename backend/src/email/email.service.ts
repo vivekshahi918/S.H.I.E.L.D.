@@ -5,7 +5,7 @@ import { google } from 'googleapis';
 import { Email } from './email.schema';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-// Verify this path matches your folder structure (e.g., ../auth/schemas/user.schema)
+// ⚠️ CHECK THIS PATH: Ensure it points to your actual User Schema file
 import { User } from '../auth/user.schema'; 
 import { encrypt, decrypt } from '../util/encryption';
 
@@ -21,12 +21,25 @@ export class EmailService {
     this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
   }
 
-  // === 1. HELPER: Sleep/Delay ===
+  // === HELPER: Create Auth Client with Refresh Token ===
+  private getAuthClient(user: any) {
+    const oauth2Client = new google.auth.OAuth2(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET
+    );
+
+    oauth2Client.setCredentials({ 
+      access_token: user.accessToken,
+      refresh_token: user.refreshToken // <--- CRITICAL: Allows auto-refresh
+    });
+
+    return oauth2Client;
+  }
+
   private delay(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  // === 2. HELPER: Classification ===
   private classifyAttachment(filename: string): string {
     const lower = filename.toLowerCase();
     if (lower.includes('invoice') || lower.includes('receipt') || lower.includes('bill')) return 'Financial';
@@ -40,92 +53,97 @@ export class EmailService {
   async fetchAndSaveEmailsFromGmail(user: any, limit = 5) {
     this.logger.log(`Starting Sync for ${user.email}...`);
     
-    const oauth2Client = new google.auth.OAuth2();
-    oauth2Client.setCredentials({ access_token: user.accessToken });
+    // ✅ FIX: Use the helper method to get the client
+    const oauth2Client = this.getAuthClient(user); 
     const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
 
-    const response = await gmail.users.messages.list({
-      userId: 'me',
-      maxResults: limit, 
-    });
-
-    const messages = response.data.messages || [];
-    
-    for (const msg of messages) {
-      if(!msg.id) continue;
-
-      const exists = await this.emailModel.findOne({ gmailId: msg.id });
-      
-      // SELF-HEALING
-      if (exists && exists.attachments.length > 0 && !exists.attachments[0]['id']) {
-         await this.emailModel.deleteOne({ gmailId: msg.id });
-      } else if (exists && exists.aiSummary && exists.aiSummary !== "Analysis unavailable.") {
-        continue;
-      }
-
-      const fullMsg = await gmail.users.messages.get({ userId: 'me', id: msg.id, format: 'full' });
-      const parsedEmail = await this.parseGmailMessage(fullMsg.data);
-
-      // === PRE-PROCESS ATTACHMENTS ===
-      let typedAttachments = parsedEmail.attachments.map((att: any) => ({
-        name: att.name,
-        id: att.id, 
-        type: this.classifyAttachment(att.name)
-      }));
-
-      // === AI SECTION ===
-      let aiResults = {
-        summary: "Email too short for AI summary.",
-        priority: "Medium",
-        category: "Personal",
-        topics: [],
-        sentiment: "Neutral",
-        attachmentTypes: [],
-        isSensitive: false,
-        sensitiveType: 'None'
-      };
-
-      if (parsedEmail.bodyText.length > 50) {
-        console.log(`⏳ Waiting 4s before analyzing: ${parsedEmail.subject.substring(0, 20)}...`);
-        await this.delay(4000); 
-
-        aiResults = await this.generateAnalysis(parsedEmail.bodyText);
-        
-        if (aiResults.attachmentTypes && aiResults.attachmentTypes.length === typedAttachments.length) {
-           typedAttachments = typedAttachments.map((att, index) => ({
-             name: att.name,
-             id: att.id,
-             type: aiResults.attachmentTypes[index] || att.type
-           }));
-        }
-      }
-
-      // Merge AI Results
-      Object.assign(parsedEmail, {
-        aiSummary: aiResults.summary,
-        priority: aiResults.priority,
-        category: aiResults.category,
-        topics: aiResults.topics,
-        sentiment: aiResults.sentiment,
-        isSensitive: aiResults.isSensitive || false,
-        sensitiveType: aiResults.sensitiveType || 'None'
+    try {
+      const response = await gmail.users.messages.list({
+        userId: 'me',
+        maxResults: limit, 
       });
 
-      // === ENCRYPTION & SAVE ===
-      const secureEmail = {
-        ...parsedEmail,
-        bodyText: encrypt(parsedEmail.bodyText),
-        bodyHtml: encrypt(parsedEmail.bodyHtml),
-        aiSummary: encrypt(parsedEmail['aiSummary'] || ''),
-        attachments: typedAttachments 
-      };
+      const messages = response.data.messages || [];
+      
+      for (const msg of messages) {
+        if(!msg.id) continue;
 
-      await this.emailModel.findOneAndUpdate(
-        { gmailId: parsedEmail.gmailId },
-        secureEmail, 
-        { upsert: true, new: true }
-      );
-      console.log(`✅ Saved (Encrypted): ${parsedEmail.subject}`);
+        const exists = await this.emailModel.findOne({ gmailId: msg.id });
+        
+        // SELF-HEALING
+        if (exists && exists.attachments.length > 0 && !exists.attachments[0]['id']) {
+           await this.emailModel.deleteOne({ gmailId: msg.id });
+        } else if (exists && exists.aiSummary && exists.aiSummary !== "Analysis unavailable.") {
+          continue;
+        }
+
+        const fullMsg = await gmail.users.messages.get({ userId: 'me', id: msg.id, format: 'full' });
+        const parsedEmail = await this.parseGmailMessage(fullMsg.data);
+
+        // === PRE-PROCESS ATTACHMENTS ===
+        let typedAttachments = parsedEmail.attachments.map((att: any) => ({
+          name: att.name,
+          id: att.id, 
+          type: this.classifyAttachment(att.name)
+        }));
+
+        // === AI SECTION ===
+        let aiResults = {
+          summary: "Email too short for AI summary.",
+          priority: "Medium",
+          category: "Personal",
+          topics: [],
+          sentiment: "Neutral",
+          attachmentTypes: [],
+          isSensitive: false,
+          sensitiveType: 'None'
+        };
+
+        if (parsedEmail.bodyText.length > 50) {
+          console.log(`⏳ Waiting 4s before analyzing: ${parsedEmail.subject.substring(0, 20)}...`);
+          await this.delay(4000); 
+
+          aiResults = await this.generateAnalysis(parsedEmail.bodyText);
+          
+          if (aiResults.attachmentTypes && aiResults.attachmentTypes.length === typedAttachments.length) {
+             typedAttachments = typedAttachments.map((att, index) => ({
+               name: att.name,
+               id: att.id,
+               type: aiResults.attachmentTypes[index] || att.type
+             }));
+          }
+        }
+
+        // Merge AI Results
+        Object.assign(parsedEmail, {
+          aiSummary: aiResults.summary,
+          priority: aiResults.priority,
+          category: aiResults.category,
+          topics: aiResults.topics,
+          sentiment: aiResults.sentiment,
+          isSensitive: aiResults.isSensitive || false,
+          sensitiveType: aiResults.sensitiveType || 'None',
+          attachments: typedAttachments 
+        });
+
+        // === ENCRYPTION & SAVE ===
+        const secureEmail = {
+          ...parsedEmail,
+          bodyText: encrypt(parsedEmail.bodyText),
+          bodyHtml: encrypt(parsedEmail.bodyHtml),
+          aiSummary: encrypt(parsedEmail['aiSummary'] || ''),
+          attachments: typedAttachments 
+        };
+
+        await this.emailModel.findOneAndUpdate(
+          { gmailId: parsedEmail.gmailId },
+          secureEmail, 
+          { upsert: true, new: true }
+        );
+        console.log(`✅ Saved (Encrypted): ${parsedEmail.subject}`);
+      }
+    } catch (error) {
+      this.logger.error(`Sync Error: ${error.message}`);
     }
 
     return this.getAllEmailsFromDB();
@@ -180,10 +198,10 @@ export class EmailService {
     };
   }
 
-  // === 5. DOWNLOAD LOGIC ===
+  // === 5. DOWNLOAD LOGIC (Updated) ===
   async getAttachment(user: any, messageId: string, attachmentId: string, filename: string, res: any) {
-    const oauth2Client = new google.auth.OAuth2();
-    oauth2Client.setCredentials({ access_token: user.accessToken });
+    // ✅ FIX: Use the helper method here too!
+    const oauth2Client = this.getAuthClient(user);
     const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
 
     try {
@@ -213,8 +231,8 @@ export class EmailService {
   // === 6. AI GENERATOR ===
   private async generateAnalysis(text: string) {
     try {
-      // Use 1.5-flash as it is the standard stable version
-      const model = this.genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+      // Using gemini-1.5-flash as it is the most stable standard for this API version
+      const model = this.genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
       
       const prompt = `
         Analyze this email. Return ONLY raw JSON.
@@ -312,38 +330,36 @@ export class EmailService {
     });
   }
 
-  // === 10. NOISE REMOVER (Delete by Category) ===
+  // === 10. NOISE REMOVER ===
   async deleteByCategory(category: string) {
-    // FIXED SYNTAX HERE:
     const result = await this.emailModel.updateMany(
-      { category: category, isDeleted: { $ne: true } }, // Filter
+      { category: category, isDeleted: { $ne: true } }, 
       { 
         $set: { 
           isDeleted: true, 
           deletedAt: new Date() 
         }
-      } // Update Action
+      } 
     );
     return { deletedCount: result.modifiedCount, message: `Moved ${result.modifiedCount} ${category} emails to trash` };
   }
 
-  // === 11. RETENTION POLICY (Manual) ===
+  // === 11. RETENTION POLICY ===
   async applyRetentionPolicy(days: number = 25) { 
     const thresholdDate = new Date();
     thresholdDate.setDate(thresholdDate.getDate() - days);
 
-    // FIXED SYNTAX HERE:
     const result = await this.emailModel.updateMany(
       { 
         receivedDate: { $lt: thresholdDate },
         isDeleted: { $ne: true }
-      }, // Filter
+      }, 
       { 
         $set: { 
           isDeleted: true, 
           deletedAt: new Date() 
         }
-      } // Update Action
+      } 
     );
     
     return { deletedCount: result.modifiedCount, message: `Archived ${result.modifiedCount} emails older than ${days} days` };
