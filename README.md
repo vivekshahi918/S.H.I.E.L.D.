@@ -42,7 +42,7 @@ It automates Gmail backup, categorizes mail using AI, detects sensitive-data lea
 ### 2️⃣ Backend (NestJS)
 - Google OAuth strategies  
 - Gmail API integration  
-- AI processing (Gemini 1.5 Flash)  
+- AI processing (Gemini 2.5 Flash)  
 - Cron jobs for email sync  
 - Deployed on **Render**
 
