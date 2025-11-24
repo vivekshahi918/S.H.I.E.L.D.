@@ -484,7 +484,7 @@ export default function Dashboard() {
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie data={stats.categories || []} cx="50%" cy="50%" outerRadius={80} fill="#8884d8" dataKey="value" label>
-                          {(stats.categories || []).map((entry:any, index:number) => (
+                          {stats.categories.map((_:any, index:number) => (
                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                           ))}
                         </Pie>
