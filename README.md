@@ -60,7 +60,7 @@ It automates Gmail backup, categorizes mail using AI, detects sensitive-data lea
 | **Frontend** | React + TS, Vite, Tailwind, Lucide |
 | **Backend** | NestJS, Express, Passport.js |
 | **Database** | MongoDB Atlas (Mongoose) |
-| **AI Engine** | Google Gemini 1.5 Flash |
+| **AI Engine** | Google Gemini 2.5 Flash |
 | **Security** | AES-256, Crypto, Helmet |
 | **Deployment** | Vercel, Render |
 
