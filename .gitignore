@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+
+# Build Outputs (Backend and Frontend)
+dist/
+build/
+out/
+
+# Environment Variables (CRITICAL: Never push these)
+.env
+.env.local
+.env.*.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs/
+*.log
+
+# OS junk files
+.DS_Store
+Thumbs.db
+
+# IDE settings (Optional, good to ignore)
+.vscode/
+.idea/
+*.swp
