@@ -5,6 +5,15 @@ import * as passport from 'passport';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  app.getHttpAdapter().getInstance().set('trust proxy', 1);
+
+  app.enableCors({
+    origin: [
+      'http://localhost:5173',
+      process.env.FRONTEND_URL, // Matches your Vercel URL
+    ],
+    credentials: true, // Required for cookies
+  });
 
   // 1. Enable Sessions (This saves the user login state)
   app.use(
@@ -12,6 +21,7 @@ async function bootstrap() {
       secret: process.env.SESSION_SECRET || 'my-super-secret-key',
       resave: false,
       saveUninitialized: false,
+      proxy: true,
       cookie: {
         maxAge: 24 * 60 * 60 * 1000,
         httpOnly: true,
