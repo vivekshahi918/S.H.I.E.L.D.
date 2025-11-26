@@ -10,7 +10,7 @@ export class EmailController {
   @Get('messages')
   async getMessages(@Req() req) {
     if (!req.user) throw new UnauthorizedException();
-    return this.emailService.getAllEmailsFromDB();
+    return this.emailService.getAllEmailsFromDB(req.user);
   }
 
   // 2. SLOW ROUTE: Actually Connect to Gmail (For Manual Sync Button)
@@ -23,14 +23,14 @@ export class EmailController {
        await this.logService.createLog(req.user.email, 'SYNC_GMAIL', 'Manual Sync Triggered');
     }
     await this.emailService.fetchAndSaveEmailsFromGmail(req.user); 
-    return this.emailService.getAllEmailsFromDB();
+    return this.emailService.getAllEmailsFromDB(req.user);
   }
 
   // 3. ANALYTICS ROUTE
   @Get('stats')
   async getStats(@Req() req) {
     if (!req.user) throw new UnauthorizedException();
-    return this.emailService.getEmailStats();
+    return this.emailService.getEmailStats(req.user);
   }
 
   // 4. DOWNLOAD ATTACHMENT ROUTE (New)
@@ -50,8 +50,8 @@ export class EmailController {
   async search(@Req() req, @Query('q') query: string) {
     if (!req.user) throw new UnauthorizedException();
     if(query) await this.logService.createLog(req.user.email, 'SEARCH', `Query: ${query}`);
-    if (!query) return this.emailService.getAllEmailsFromDB(); // Return all if empty
-    return this.emailService.searchEmails(query);
+    if (!query) return this.emailService.getAllEmailsFromDB(req.user); // Return all if empty
+    return this.emailService.searchEmails(req.user, query);
   }
 
   @Delete('cleanup/category')
@@ -61,7 +61,7 @@ export class EmailController {
     // 📜 LOG IT
     await this.logService.createLog(req.user.email, 'CLEANUP', `Deleted all ${category} emails`);
     
-    return this.emailService.deleteByCategory(category);
+    return this.emailService.deleteByCategory(req.user, category);
   }
 
   @Delete('cleanup/retention')

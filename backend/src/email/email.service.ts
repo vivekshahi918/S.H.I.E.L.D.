@@ -68,11 +68,11 @@ export class EmailService {
       for (const msg of messages) {
         if(!msg.id) continue;
 
-        const exists = await this.emailModel.findOne({ gmailId: msg.id });
+        const exists = await this.emailModel.findOne({ gmailId: msg.id, ownerEmail: user.email });
         
         // SELF-HEALING
         if (exists && exists.attachments.length > 0 && !exists.attachments[0]['id']) {
-           await this.emailModel.deleteOne({ gmailId: msg.id });
+           await this.emailModel.deleteOne({ gmailId: msg.id, ownerEmail: user.email });
         } else if (exists && exists.aiSummary && exists.aiSummary !== "Analysis unavailable.") {
           continue;
         }
@@ -129,6 +129,7 @@ export class EmailService {
         // === ENCRYPTION & SAVE ===
         const secureEmail = {
           ...parsedEmail,
+          ownerEmail: user.email,
           bodyText: encrypt(parsedEmail.bodyText),
           bodyHtml: encrypt(parsedEmail.bodyHtml),
           aiSummary: encrypt(parsedEmail['aiSummary'] || ''),
@@ -136,7 +137,7 @@ export class EmailService {
         };
 
         await this.emailModel.findOneAndUpdate(
-          { gmailId: parsedEmail.gmailId },
+          { gmailId: parsedEmail.gmailId, ownerEmail: user.email},
           secureEmail, 
           { upsert: true, new: true }
         );
@@ -146,7 +147,7 @@ export class EmailService {
       this.logger.error(`Sync Error: ${error.message}`);
     }
 
-    return this.getAllEmailsFromDB();
+    return this.getAllEmailsFromDB(user);
   }
 
   // === 4. PARSER ===
@@ -270,12 +271,12 @@ export class EmailService {
   }
 
   // === 7. ANALYTICS ===
-  async getEmailStats() {
-    const total = await this.emailModel.countDocuments({isDeleted: { $ne: true }});
+  async getEmailStats(user:any) {
+    const total = await this.emailModel.countDocuments({isDeleted: { $ne: true }, ownerEmail: user.email});
     const normalizeStats = async (field: string) => {
       const rawStats = await this.emailModel.aggregate([
         { 
-          $match: { isDeleted: { $ne: true } } 
+          $match: { isDeleted: { $ne: true }, ownerEmail: user.email } 
         },
         { $group: { _id: { $toUpper: `$${field}` }, count: { $sum: 1 }, originalLabel: { $first: `$${field}` } } }
       ]);
@@ -294,8 +295,8 @@ export class EmailService {
   }
 
   // === 8. GET EMAILS ===
-  async getAllEmailsFromDB() {
-    const allEmails = await this.emailModel.find({ isDeleted: { $ne: true } })
+  async getAllEmailsFromDB(user:any) {
+    const allEmails = await this.emailModel.find({ isDeleted: { $ne: true }, ownerEmail: user.email })
       .sort({ receivedDate: -1 })
       .exec();
     
@@ -311,9 +312,9 @@ export class EmailService {
   }
 
   // === 9. SEARCH FUNCTION ===
-  async searchEmails(query: string) {
+  async searchEmails(user:any, query: string) {
     const results = await this.emailModel.find(
-      { $text: { $search: query }, isDeleted: { $ne: true } },
+      { ownerEmail: user.email, $text: { $search: query }, isDeleted: { $ne: true } },
       { score: { $meta: 'textScore' } } 
     )
     .sort({ score: { $meta: 'textScore' } })
@@ -331,9 +332,9 @@ export class EmailService {
   }
 
   // === 10. NOISE REMOVER ===
-  async deleteByCategory(category: string) {
+  async deleteByCategory(user:any,category: string) {
     const result = await this.emailModel.updateMany(
-      { category: category, isDeleted: { $ne: true } }, 
+      { category: category, isDeleted: { $ne: true }, ownerEmail: user.email}, 
       { 
         $set: { 
           isDeleted: true, 
@@ -345,7 +346,7 @@ export class EmailService {
   }
 
   // === 11. RETENTION POLICY ===
-  async applyRetentionPolicy(days: number = 25) { 
+  async applyRetentionPolicy(days: number = 30) { 
     const thresholdDate = new Date();
     thresholdDate.setDate(thresholdDate.getDate() - days);
 

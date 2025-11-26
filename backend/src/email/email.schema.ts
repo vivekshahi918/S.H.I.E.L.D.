@@ -45,6 +45,9 @@ export class Email extends Document {
   @Prop()
   receivedDate: Date;
 
+  @Prop({ required: true, index: true }) 
+  ownerEmail: string; 
+
   @Prop({ type: [AttachmentSchema] })
   attachments: Attachment[];
 
