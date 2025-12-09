@@ -10,7 +10,7 @@ It automates Gmail backup, categorizes mail using AI, detects sensitive-data lea
 
 ## 🌟 Key Features
 
-### 🧠 AI-Powered Intelligence (Gemini 1.5 Flash)
+### 🧠 AI-Powered Intelligence (Gemini 2.5 Flash)
 - Smart AI summaries for long email threads  
 - Sentiment classification (Positive / Neutral / Negative)  
 - Auto-categorization: Work, Finance, Personal, Promotions  
