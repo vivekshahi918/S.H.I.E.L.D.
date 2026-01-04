@@ -87,8 +87,8 @@ It automates Gmail backup, categorizes mail using AI, detects sensitive-data lea
 ## 1️⃣ Clone the Repository
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/email-archiver-final.git
-cd email-archiver-final
+git clone https://github.com/vivekshahi918/S.H.I.E.L.D..git
+cd S.H.I.E.L.D.
 ```
 
 ## 🖥️ 2️⃣ Backend Setup
