@@ -5,13 +5,11 @@ import { GoogleStrategy } from './google.strategy';
 import { MongooseModule } from '@nestjs/mongoose';
 import { User, UserSchema } from './user.schema';
 import { SessionSerializer } from './session.serializer'; 
-import { PassportModule } from '@nestjs/passport'; // <--- Ensure this is imported
+import { PassportModule } from '@nestjs/passport'; 
 
 @Module({
   imports: [
-    // ⬇️ THIS IS THE MISSING PIECE ⬇️
     PassportModule.register({ session: true }), 
-    // ⬆️ We must explicitly tell Passport to use sessions ⬆️
 
     MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
   ],
