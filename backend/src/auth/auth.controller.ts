@@ -15,7 +15,6 @@ export class AuthController {
   @Get('google/callback')
   @UseGuards(AuthGuard('google'))
   async googleAuthRedirect(@Req() req, @Res() res) {
-    // ⬇️ FIX: Manually force the session login ⬇️
     // This forces the "Serializer" to run
     await new Promise<void>((resolve, reject) => {
       req.login(req.user, (err) => {
